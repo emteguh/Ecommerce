@@ -27,7 +27,7 @@ class Category(MPTTNode):
         return reverse("store:category_list", args=[self.slug])
 
     def __str__(self):
-        return self.name
+        return f"{self.id}. {self.name}"
 
 
 class ProductType(models.Model):

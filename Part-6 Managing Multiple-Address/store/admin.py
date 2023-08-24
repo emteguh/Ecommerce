@@ -1,6 +1,6 @@
-from django import forms
 from django.contrib import admin
 from mptt2.admin import MPTTModelAdmin
+
 
 from .models import (
     Category,

@@ -9,12 +9,27 @@ def product_all(request):
     return render(request, "store/index.html", {"products": products})
 
 
+# def category_list(request, category_slug=None):
+#     category = get_object_or_404(Category, slug=category_slug)
+#     products = Product.objects.filter(
+#         category__in=Category.objects.get(
+#             name=category_slug).get_descendants(include_self=True, asc=True)
+#     )
+#     return render(request, "store/category.html", {"category": category, "products": products})
+
+
 def category_list(request, category_slug=None):
-    category = get_object_or_404(Category, slug=category_slug)
-    products = Product.objects.filter(
-        category__in=Category.objects.get(
-            name=category_slug).get_descendants(include_self=True)
-    )
+    try:
+        category = Category.objects.get(slug=category_slug)
+    except Category.DoesNotExist:
+        category = None
+
+    if category:
+        descendants = category.get_descendants(include_self=True, asc=True)
+        products = Product.objects.filter(category__in=descendants)
+    else:
+        products = Product.objects.none()
+
     return render(request, "store/category.html", {"category": category, "products": products})
 
 

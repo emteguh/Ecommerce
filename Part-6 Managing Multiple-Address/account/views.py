@@ -2,16 +2,17 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.urls import reverse
 
 from orders.views import user_orders
 
-from .forms import PwdResetConfirmForm, RegistrationForm, UserEditForm
-from .models import UserBase
+from .forms import RegistrationForm, UserEditForm, UserAddressForm
+from .models import Customer, Address
 from .tokens import account_activation_token
 
 
@@ -38,13 +39,14 @@ def edit_details(request):
         user_form = UserEditForm(instance=request.user)
 
     return render(
-        request, "account/dashboard/edit_details.html", {"user_form": user_form}
+        request, "account/dashboard/edit_details.html", {
+            "user_form": user_form}
     )
 
 
 @login_required
 def delete_user(request):
-    user = UserBase.objects.get(user_name=request.user)
+    user = Customer.objects.get(user_name=request.user)
     user.is_active = False
     user.save()
     logout(request)
@@ -52,41 +54,37 @@ def delete_user(request):
 
 
 def account_register(request):
-    if request.user.is_authenticated:
-        return redirect("account:dashboard")
 
-    if request.method == "POST":
+    if request.user.is_authenticated:
+        return redirect('account:dashboard')
+
+    if request.method == 'POST':
         registerForm = RegistrationForm(request.POST)
         if registerForm.is_valid():
             user = registerForm.save(commit=False)
-            user.email = registerForm.cleaned_data["email"]
-            user.set_password(registerForm.cleaned_data["password"])
+            user.email = registerForm.cleaned_data['email']
+            user.set_password(registerForm.cleaned_data['password'])
             user.is_active = False
             user.save()
-            # setup emaill
             current_site = get_current_site(request)
-            subject = "Activate your Account"
-            message = render_to_string(
-                "account/registration/account_activation_email.html",
-                {
-                    "user": user,
-                    "domain": current_site.domain,
-                    "uid": urlsafe_base64_encode(force_bytes(user.pk)),
-                    "token": account_activation_token.make_token(user),
-                },
-            )
+            subject = 'Activate your Account'
+            message = render_to_string('account/registration/account_activation_email.html', {
+                'user': user,
+                'domain': current_site.domain,
+                'uid': urlsafe_base64_encode(force_bytes(user.pk)),
+                'token': account_activation_token.make_token(user),
+            })
             user.email_user(subject=subject, message=message)
-            return HttpResponse("registered succesfully and activation sent")
-
+            return render(request, 'account/registration/register_email_confirm.html', {'form': registerForm})
     else:
         registerForm = RegistrationForm()
-    return render(request, "account/registration/register.html", {"form": registerForm})
+    return render(request, 'account/registration/register.html', {'form': registerForm})
 
 
 def account_activate(request, uidb64, token):
     try:
         uid = force_str(urlsafe_base64_decode(uidb64))
-        user = UserBase.objects.get(pk=uid)
+        user = Customer.objects.get(pk=uid)
     except (TypeError, ValueError, OverflowError, user.DoesNotExist):
         user = None
     if user is not None and account_activation_token.check_token(user, token):
@@ -98,26 +96,51 @@ def account_activate(request, uidb64, token):
         return render(request, "account/registration/activation_invalid.html")
 
 
-# @user_passes_test(lambda u: not u.is_authenticated, login_url='account:dashboard')
-# def account_password_reset_confirm(request, uidb64, token):
-#     try:
-#         uid = urlsafe_base64_decode(uidb64).decode()
-#         user = UserBase.objects.get(pk=uid)
-#     except (TypeError, ValueError, OverflowError, UserBase.DoesNotExist):
-#         user = None
+# Addresses
 
-#     if user is not None and default_token_generator.check_token(user, token):
-#         if request.method == 'POST':
-#             form = PwdResetConfirmForm(request.POST)
-#             if form.is_valid():
-#                 new_password = form.cleaned_data['new_password1']
-#                 user.set_password(new_password)
-#                 user.is_active = True  # Activate the user after password reset
-#                 user.save()
-#                 return redirect('account:password_reset_complete')
-#         else:
-#             form = PwdResetConfirmForm()
+@login_required
+def view_address(request):
+    addresses = Address.objects.filter(customer=request.user)
+    return render(request, "account/dashboard/addresses.html", {"addresses": addresses})
 
-#         return render(request, 'account/user/password_reset_confirm.html', {'form': form})
-#     else:
-#         return HttpResponseBadRequest('Invalid reset link')
+
+@login_required
+def add_address(request):
+    if request.method == "POST":
+        address_form = UserAddressForm(data=request.POST)
+        if address_form.is_valid():
+            address_form = address_form.save(commit=False)
+            address_form.customer = request.user
+            address_form.save()
+            return HttpResponseRedirect(reverse("account:addresses"))
+    else:
+        address_form = UserAddressForm()
+    return render(request, "account/dashboard/edit_addresses.html", {"form": address_form})
+
+
+@login_required
+def edit_address(request, id):
+    if request.method == "POST":
+        address = Address.objects.get(pk=id, customer=request.user)
+        address_form = UserAddressForm(instance=address, data=request.POST)
+        if address_form.is_valid():
+            address_form.save()
+            return HttpResponseRedirect(reverse("account:addresses"))
+    else:
+        address = Address.objects.get(pk=id, customer=request.user)
+        address_form = UserAddressForm(instance=address)
+    return render(request, "account/dashboard/edit_addresses.html", {"form": address_form})
+
+
+@login_required
+def delete_address(request, id):
+    address = Address.objects.filter(pk=id, customer=request.user).delete()
+    return redirect("account:addresses")
+
+
+@login_required
+def set_default(request, id):
+    Address.objects.filter(customer=request.user,
+                           default=True).update(default=False)
+    Address.objects.filter(pk=id, customer=request.user).update(default=True)
+    return redirect("account:addresses")
