@@ -128,17 +128,6 @@ AUTH_USER_MODEL = "account.Customer"
 LOGIN_REDIRECT_URL = "/account/dashboard"
 LOGIN_URL = "/account/login/"
 
-# Stripe Payment
-os.environ.setdefault(
-    "STRIPE_PUBLISHABLE_KEY",
-    "pk_test_51NXOYVD4BhLDGloIZC8jIYkNLBBaI3Pm3IHc1jZ1j3hpVL4dA8k0fmhddAewyVZ00qhsCkTM84HeYNUo1roI5zZp00514GJx8c",
-)
-# PUBLISHABLE_KEY = 'pk_test_51NXOYVD4BhLDGloIZC8jIYkNLBBaI3Pm3IHc1jZ1j3hpVL4dA8k0fmhddAewyVZ00qhsCkTM84HeYNUo1roI5zZp00514GJx8c'
-STRIPE_SECRET_KEY = "sk_test_51NXOYVD4BhLDGloILB9pzzji8QcYttcHvtzc3dhQ34lmtVMglLA2KydiJaGI0e0JL9MTJplFEOd1qZZtf7O5ELFh00uMmwNxNa"
-STRIPE_ENDPOINT_SECRET = (
-    "whsec_811486aec38b39c30dbeac5d9ef9dbb41be7933e35bdd81030340e91f720a6bc"
-)
-# stripe listen --forward-to localhost:8000/payment/webhook/
 
 # Email setting
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
